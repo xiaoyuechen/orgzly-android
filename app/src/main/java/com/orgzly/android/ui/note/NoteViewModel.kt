@@ -1,5 +1,6 @@
 package com.orgzly.android.ui.note
 
+import android.net.Uri
 import android.os.Bundle
 import android.text.TextUtils
 import androidx.lifecycle.LiveData
@@ -14,18 +15,21 @@ import com.orgzly.android.db.entity.NoteView
 import com.orgzly.android.prefs.AppPreferences
 import com.orgzly.android.ui.*
 import com.orgzly.android.ui.main.MainActivity
+import com.orgzly.android.ui.share.ShareActivity
 import com.orgzly.android.usecase.*
 import com.orgzly.android.util.MiscUtils
 import com.orgzly.org.OrgProperties
 import com.orgzly.org.datetime.OrgRange
 import com.orgzly.org.parser.OrgParserWriter
+import java.util.*
 
 data class NoteInitialData(
     val bookId: Long,
     val noteId: Long, // Could be 0 if new note is being created
     val place: Place? = null, // Relative location, used for new notes
     val title: String? = null, // Initial title, used for when sharing
-    val content: String? = null // Initial content, used for when sharing
+    val content: String? = null, // Initial content, used for when sharing
+    val attachmentUri: Uri? = null // Initial attachment Uri, used for when sharing
 )
 
 class NoteViewModel(
@@ -37,6 +41,7 @@ class NoteViewModel(
     private val place = initialData.place
     private val title = initialData.title
     private val content = initialData.content
+    private val attachmentUri = initialData.attachmentUri
 
     enum class ViewEditMode {
         VIEW,
@@ -92,10 +97,14 @@ class NoteViewModel(
                 dataRepository.getNoteAncestors(noteId)
             }
 
-            notePayload = if (isNew()) {
-                NoteBuilder.newPayload(App.getAppContext(), title ?: "", content)
+            if (isNew()) {
+                notePayload = NoteBuilder.newPayload(App.getAppContext(), title ?: "", content, attachmentUri)
+                // Auto generate ID property if it has attachment.
+                if (attachmentUri != null && AppPreferences.attachMethod(App.getAppContext()) == ShareActivity.ATTACH_METHOD_COPY_ID) {
+                    updatePayloadCreateIdProperty()
+                }
             } else {
-                dataRepository.getNotePayload(noteId)
+                notePayload = dataRepository.getNotePayload(noteId)
             }
 
             // Calculate payload's hash once for the original note
@@ -234,6 +243,15 @@ class NoteViewModel(
 
     fun updatePayloadClosedTime(range: OrgRange?) {
         notePayload = notePayload?.copy(closed = range?.toString())
+    }
+
+    private fun updatePayloadCreateIdProperty() {
+        if (notePayload?.properties!!.containsKey("ID")) {
+            return
+        }
+        notePayload = notePayload?.copy()
+        val idStr = UUID.randomUUID().toString().uppercase()
+        notePayload?.properties!!.put("ID", idStr)
     }
 
     private fun createNote(postSave: ((note: Note) -> Unit)?) {

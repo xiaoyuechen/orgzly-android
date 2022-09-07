@@ -3,6 +3,7 @@ package com.orgzly.android.ui.note
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextUtils
@@ -113,8 +114,9 @@ class NoteFragment : Fragment(), View.OnClickListener, TimestampDialogFragment.O
             // Initial values when sharing
             val title = args.getString(ARG_TITLE)
             val content = args.getString(ARG_CONTENT)
+            val attachmentUri = args.getString(ARG_ATTACHMENT_URI)?.let { Uri.parse(it) }
 
-            return NoteInitialData(bookId, noteId, place, title, content)
+            return NoteInitialData(bookId, noteId, place, title, content, attachmentUri)
         }
     }
 
@@ -549,6 +551,7 @@ class NoteFragment : Fragment(), View.OnClickListener, TimestampDialogFragment.O
 
         binding.bodyView.setSourceText(binding.contentEdit.text.toString())
 
+        AttachmentSpanLoader.loadAttachmentPaths(viewModel.noteId, binding.bodyView)
         ImageLoader.loadImages(binding.bodyView)
 
         binding.bodyView.visibility = View.VISIBLE
@@ -594,6 +597,7 @@ class NoteFragment : Fragment(), View.OnClickListener, TimestampDialogFragment.O
 
         binding.bodyView.setSourceText(payload.content ?: "")
 
+        AttachmentSpanLoader.loadAttachmentPaths(viewModel.noteId, binding.bodyView)
         ImageLoader.loadImages(binding.bodyView)
     }
 
@@ -1231,21 +1235,24 @@ class NoteFragment : Fragment(), View.OnClickListener, TimestampDialogFragment.O
         private const val ARG_PLACE = "place"
         private const val ARG_TITLE = "title"
         private const val ARG_CONTENT = "content"
+        private const val ARG_ATTACHMENT_URI = "attachment_uri"
 
         @JvmStatic
         @JvmOverloads
         fun forNewNote(
-            notePlace: NotePlace,
-            initialTitle: String? = null,
-            initialContent: String? = null): NoteFragment? {
+                notePlace: NotePlace,
+                initialTitle: String? = null,
+                initialContent: String? = null,
+                attachmentUri: Uri? = null): NoteFragment? {
 
             return if (notePlace.bookId > 0) {
                 getInstance(
-                    notePlace.bookId,
-                    notePlace.noteId,
-                    notePlace.place,
-                    initialTitle,
-                    initialContent)
+                        notePlace.bookId,
+                        notePlace.noteId,
+                        notePlace.place,
+                        initialTitle,
+                        initialContent,
+                        attachmentUri)
             } else {
                 Log.e(TAG, "Invalid book id ${notePlace.bookId}")
                 null
@@ -1264,11 +1271,12 @@ class NoteFragment : Fragment(), View.OnClickListener, TimestampDialogFragment.O
 
         @JvmStatic
         private fun getInstance(
-            bookId: Long,
-            noteId: Long,
-            place: Place? = null,
-            initialTitle: String? = null,
-            initialContent: String? = null): NoteFragment {
+                bookId: Long,
+                noteId: Long,
+                place: Place? = null,
+                initialTitle: String? = null,
+                initialContent: String? = null,
+                attachmentUri: Uri? = null): NoteFragment {
 
             val fragment = NoteFragment()
 
@@ -1290,6 +1298,10 @@ class NoteFragment : Fragment(), View.OnClickListener, TimestampDialogFragment.O
 
             if (initialContent != null) {
                 args.putString(ARG_CONTENT, initialContent)
+            }
+
+            if (attachmentUri != null) {
+                args.putString(ARG_ATTACHMENT_URI, attachmentUri.toString())
             }
 
             fragment.arguments = args

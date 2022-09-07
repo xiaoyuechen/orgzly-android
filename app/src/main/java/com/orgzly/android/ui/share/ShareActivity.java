@@ -13,6 +13,7 @@ import android.util.Log;
 
 import androidx.core.app.TaskStackBuilder;
 import androidx.core.content.pm.ShortcutManagerCompat;
+import androidx.documentfile.provider.DocumentFile;
 
 import com.orgzly.BuildConfig;
 import com.orgzly.R;
@@ -22,6 +23,7 @@ import com.orgzly.android.data.DataRepository;
 import com.orgzly.android.db.entity.Book;
 import com.orgzly.android.db.entity.Note;
 import com.orgzly.android.db.entity.SavedSearch;
+import com.orgzly.android.prefs.AppPreferences;
 import com.orgzly.android.query.Query;
 import com.orgzly.android.query.QueryUtils;
 import com.orgzly.android.query.user.DottedQueryParser;
@@ -37,6 +39,7 @@ import com.orgzly.android.usecase.UseCase;
 import com.orgzly.android.usecase.UseCaseResult;
 import com.orgzly.android.util.LogUtils;
 import com.orgzly.android.util.MiscUtils;
+import com.orgzly.org.OrgStringUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,6 +60,10 @@ public class ShareActivity extends CommonActivity
         SyncFragment.Listener {
 
     public static final String TAG = ShareActivity.class.getName();
+
+    public static final String ATTACH_METHOD_LINK = "link";
+    public static final String ATTACH_METHOD_COPY_DIR = "copy_dir";
+    public static final String ATTACH_METHOD_COPY_ID = "copy_id";
 
     /** Shared text files are read and their content is stored as note content. */
     private static final long MAX_TEXT_FILE_LENGTH_FOR_CONTENT = 1024 * 1024 * 2; // 2 MB
@@ -169,11 +176,13 @@ public class ShareActivity extends CommonActivity
                     data.bookId = SharingShortcutsManager.bookIdFromShortcutId(shortcutId);
                 }
 
-            } else if (type.startsWith("image/")) {
-                handleSendImage(intent, data); // Handle single image being sent
-
+            } else if (ATTACH_METHOD_COPY_DIR.equals(AppPreferences.attachMethod(this))) {
+                handleCopyFile(intent, data, "file:");
+            } else if (ATTACH_METHOD_COPY_ID.equals(AppPreferences.attachMethod(this))) {
+                handleCopyFile(intent, data, "attachment:");
             } else {
-                mError = getString(R.string.share_type_not_supported, type);
+                // Link method.
+                handleLinkFile(intent, data);
             }
 
         } else if (action.equals("com.google.android.gm.action.AUTO_SEND")) {
@@ -189,6 +198,9 @@ public class ShareActivity extends CommonActivity
         if (data.title == null) {
             data.title = "";
         }
+
+        if (BuildConfig.LOG_DEBUG)
+            LogUtils.d(TAG, "Data title: " + data.title + " attachmentUri: " + data.attachmentUri);
 
         return data;
     }
@@ -214,7 +226,7 @@ public class ShareActivity extends CommonActivity
                 }
 
                 noteFragment = NoteFragment.forNewNote(
-                        new NotePlace(bookId), data.title, data.content);
+                        new NotePlace(bookId), data.title, data.content, data.attachmentUri);
 
                 getSupportFragmentManager()
                         .beginTransaction()
@@ -314,14 +326,15 @@ public class ShareActivity extends CommonActivity
     private class Data {
         String title;
         String content;
+        public Uri attachmentUri;
         Long bookId = null;
     }
 
     /**
-     * Get file path from image shared with Orgzly
+     * Get file path shared with Orgzly
      * and put it as a file link in the note's content.
      */
-    private void handleSendImage(Intent intent, Data data) {
+    private void handleLinkFile(Intent intent, Data data) {
         // Get file uri from intent which probably looks like this:
         // content://media/external/images/...
         Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
@@ -348,8 +361,7 @@ public class ShareActivity extends CommonActivity
 
                 if (data.content == null) {
                     data.content = uri.toString()
-                            + "\n\nCannot determine path to this image "
-                            + "and only linking to an image is currently supported.";
+                            + "\n\nCannot determine a local path to this file.";
 
                     Log.e(TAG, DatabaseUtils.dumpCursorToString(cursor));
                 }
@@ -366,7 +378,29 @@ public class ShareActivity extends CommonActivity
 
         if (data.title == null) {
             data.title = uri.toString();
-            data.content = "Cannot find image using this URI.";
+            data.content = "Cannot find filename using this URI.";
         }
+    }
+
+    private void handleCopyFile(Intent intent, Data data, String linkPrefix) {
+        Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+
+        // Get the file name of the content.
+        DocumentFile documentFile = DocumentFile.fromSingleUri(this, uri);
+        String fileName = null;
+        if (documentFile != null) {
+            fileName = documentFile.getName();
+        }
+        if (!OrgStringUtils.isEmpty(fileName)) {
+            data.title = fileName;
+            data.content = "[[" + linkPrefix + fileName + "]]";
+        } else {
+            data.title = uri.toString();
+            data.content = uri.toString() + "\n\nCannot determine fileName to this content.";
+        }
+
+        // Don't copy the file here, only copy it when a note is saved.
+        // Let's pass the Uri to NoteFragment.
+        data.attachmentUri = uri;
     }
 }

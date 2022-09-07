@@ -14,6 +14,7 @@ import com.orgzly.R
 import com.orgzly.android.AppIntent
 import com.orgzly.android.OrgzlyTest
 import com.orgzly.android.espresso.EspressoUtils.*
+import com.orgzly.android.prefs.AppPreferences
 import com.orgzly.android.ui.share.ShareActivity
 import org.hamcrest.Matchers.startsWith
 import org.junit.Assert.assertTrue
@@ -157,17 +158,23 @@ class ShareActivityTest : OrgzlyTest() {
                 extraStreamUri = "content://uri")
 
         onView(withId(R.id.title)).check(matches(withText("content://uri")))
-        onView(withId(R.id.content_edit)).check(matches(withText("Cannot find image using this URI.")))
+        onView(withId(R.id.content_edit)).check(matches(withText("content://uri\n\nCannot determine fileName to this content.")))
 
         onView(withId(R.id.done)).perform(click()); // Note done
     }
 
     @Test
-    fun testNoMatchingType() {
-        startActivityWithIntent(action = Intent.ACTION_SEND, type = "application/octet-stream")
+    fun testFileCopy() {
+        AppPreferences.attachMethod(context, ShareActivity.ATTACH_METHOD_COPY_DIR);
+        startActivityWithIntent(
+                action = Intent.ACTION_SEND,
+                type = "application/pdf",
+                extraStreamUri = "content://uri")
 
-        onView(withId(R.id.title)).check(matches(withText("")))
-        onSnackbar().check(matches(withText(context.getString(R.string.share_type_not_supported, "application/octet-stream"))))
+        onView(withId(R.id.title)).check(matches(withText("content://uri")))
+        onView(withId(R.id.content_edit)).check(matches(withText("content://uri\n\nCannot determine fileName to this content.")))
+
+        onView(withId(R.id.done)).perform(click()) // Note done
     }
 
     @Test
