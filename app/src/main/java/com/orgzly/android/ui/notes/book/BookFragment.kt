@@ -677,6 +677,13 @@ class BookFragment :
             in deadlineTimeButtonIds() ->
                 displayTimestampDialog(itemId, ids)
 
+            R.id.quick_bar_clock_in ->
+                sharedMainActivityViewModel.clockingUpdateRequest(ids, 0)
+            R.id.quick_bar_clock_out ->
+                sharedMainActivityViewModel.clockingUpdateRequest(ids, 1)
+            R.id.quick_bar_clock_cancel ->
+                sharedMainActivityViewModel.clockingUpdateRequest(ids, 2)
+
             R.id.quick_bar_delete,
             R.id.delete_note -> {
                 delete(ids)

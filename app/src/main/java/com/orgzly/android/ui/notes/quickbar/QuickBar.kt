@@ -163,7 +163,10 @@ class QuickBar(val context: Context, val inBook: Boolean) {
                 Button(R.id.quick_bar_schedule, R.drawable.ic_today),
                 Button(R.id.quick_bar_deadline, R.drawable.ic_alarm),
                 Button(R.id.quick_bar_state, R.drawable.ic_flag),
-                Button(R.id.quick_bar_done, R.drawable.ic_check_circle_outline)
+                Button(R.id.quick_bar_done, R.drawable.ic_check_circle_outline),
+                Button(R.id.quick_bar_clock_in, R.drawable.ic_hourglass_top),
+                Button(R.id.quick_bar_clock_out, R.drawable.ic_hourglass_bottom),
+                Button(R.id.quick_bar_clock_cancel, R.drawable.ic_hourglass_disabled)
             )
 
             private val LEFT_IN_BOOK = listOf(
